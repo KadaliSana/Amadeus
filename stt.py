@@ -2,58 +2,62 @@ import os
 import pyaudio
 import wave
 import torch
-import whisperx
+import nemo.collections.asr as nemo_asr
+import soundfile as sf
 
-class stt():
+class STT:
     def __init__(self):
-        torch.hub.set_dir("D:\\AI\\Amadeus")
+        # Load Parakeet model
+        self.model = nemo_asr.models.EncDecCTCModel.from_pretrained(
+            model_name="nvidia/parakeet-tdt-0.6b-v2"
+        )
 
-        # Setup device
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        compute_type = "float16" if device == "cuda" else "int8"
+        # Audio settings
+        self.FORMAT = pyaudio.paInt16
+        self.CHANNELS = 1
+        self.RATE = 16000  # NeMo expects 16kHz
+        self.CHUNK = 1024
+        self.RECORD_SECONDS = 5
+        self.DEVICE_INDEX = None
 
-        # Load WhisperX model
-        model = whisperx.load_model("small", device, compute_type=compute_type)
+        # Save path
+        self.SAVE_DIR = "recordings"
+        os.makedirs(self.SAVE_DIR, exist_ok=True)
 
-        # Mic setup
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 16000
-        CHUNK = 1024
-        RECORD_SECONDS = 5
-        DEVICE_INDEX = None
+        self.p = pyaudio.PyAudio()
 
-        SAVE_DIR = "D:\\AI\\recordings"
-        os.makedirs(SAVE_DIR, exist_ok=True)
-
-        p = pyaudio.PyAudio()
-    
     def listen(self):
-        stream = p.open(format=self.FORMAT,
-                        channels=self.CHANNELS,
-                        rate=self.RATE,
-                        input=True,
-                        input_device_index=self.DEVICE_INDEX,
-                        frames_per_buffer=self.CHUNK)
+        stream = self.p.open(format=self.FORMAT,
+                             channels=self.CHANNELS,
+                             rate=self.RATE,
+                             input=True,
+                             input_device_index=self.DEVICE_INDEX,
+                             frames_per_buffer=self.CHUNK)
 
-        print("🎙️ Listening... Press Ctrl+C to stop.")
+        print("🎙️ Listening for 5 seconds...")
+
         frames = []
         for _ in range(int(self.RATE / self.CHUNK * self.RECORD_SECONDS)):
             data = stream.read(self.CHUNK)
             frames.append(data)
 
-        filename = os.path.join(self.SAVE_DIR, f"recording.wav")
+        stream.stop_stream()
+        stream.close()
 
-        # Save recorded audio
-        with wave.open(filename, 'wb') as wf:
-            wf.setnchannels(self.CHANNELS)
-            wf.setsampwidth(p.get_sample_size(self.FORMAT))
-            wf.setframerate(self.RATE)
-            wf.writeframes(b''.join(frames))
+        filename = os.path.join(self.SAVE_DIR, "recording.wav")
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(self.CHANNELS)
+        wf.setsampwidth(self.p.get_sample_size(self.FORMAT))
+        wf.setframerate(self.RATE)
+        wf.writeframes(b''.join(frames))
+        wf.close()
 
-        # Transcribe using WhisperX
-        audio = whisperx.load_audio(filename)
-        result = self.model.transcribe(audio, batch_size=16)
+        # Optionally resave using soundfile for correct format
+        data, sr = sf.read(filename)
+        sf.write(filename, data, sr, subtype='PCM_16')
+
+        # Transcribe with Parakeet
+        result = self.model.transcribe([filename])[0].text
 
         os.remove(filename)
-        return result["text"]
+        return result

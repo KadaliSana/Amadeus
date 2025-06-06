@@ -1,27 +1,25 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from stt import stt
-import torch
-from huggingface_hub import login
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
+from stt import STT
+import os
 
-login(token="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")
-# Use the quantized or full model path from Hugging Face
-MODEL_NAME = "google/gemma-3-4b-it-qat-q4_0-gguf"
+# Initialize STT
+stt = STT()
+prompt_text = stt.listen()
 
-# Check GPU availability
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Transcribed Text: {prompt_text}")
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32)
-model.to(device)
+os.environ['HF_HUB_CACHE'] = "/home/kadalisana/Amadeus/models/cache"
+os.environ['HF_HOME'] = "/home/kadalisana/Amadeus/models"
+os.environ["GOOGLE_API_KEY"]="AIzaSyADGgdcpX1pQuRNisY0cGeZBpjnqvw5jnE"
 
-# Define the prompt
-prompt = stt.listen()
+# Initialize Gemini model
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20",temperature=0)
 
-# Tokenize and generate
-inputs = tokenizer(prompt, return_tensors="pt").to(device)
-outputs = model.generate(**inputs, max_new_tokens=200, do_sample=True, temperature=0.7)
+# Create a HumanMessage
+message = HumanMessage(content=prompt_text)
 
-# Decode and print result
-result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-print("Response:\n", result)
+# Get response from Gemini
+response = llm.invoke([message])
+
+print(f"Gemini Response: {response.content}")

@@ -1,0 +1,53 @@
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.resizer {
+  width: 0.5px;
+  background: #757575;
+  cursor: col-resize;
+}
+
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.input-area {
+  display: flex;
+  gap: 10px;
+
+}
+
+.input-area input {
+  flex: 1;
+  padding: 8px;
+}
+
+button.recording {
+  background-color: red;
+  color: white;
+}
+
+.avatar-area {
+  width: 25%;
+  background-color: #fff;
+  position: relative; /* Important for placing canvas inside */
+  box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+}
+
