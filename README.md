@@ -44,8 +44,6 @@ To run the Amadeus project locally, you need to start both the frontend and back
 The frontend application is started using the Node Package Manager (npm).
 
 ```bash
-# Navigate to the frontend project directory
-cd /path/to/your/frontend
 
 # To Install dependencies 
 npm install
