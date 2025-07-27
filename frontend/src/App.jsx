@@ -60,20 +60,20 @@ function App() {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
-    const newMsg = { role: 'User', content: input };
+    const newMsg = { role: 'user', content: input };
     const updated = [...messages, newMsg];
     setMessages(updated);
     setInput('');
 
     try {
-      const res = await fetch('/api/send', {
+      const res = await fetch('http://127.0.0.1:5050/api/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updated }),
       });
       const data = await res.json();
-      setMessages([...updated, { role: 'Bot', content: data.reply }]);
-      fetchHistory(); // Refresh
+      setMessages([...updated, { role: 'assistant', content: data.reply }]);
+      fetchHistory(); 
     } catch (err) {
       console.error('Send failed:', err);
     }

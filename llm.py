@@ -1,25 +1,55 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
-from stt import STT
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langchain_core.messages import HumanMessage, AIMessage
+import sqlite3
 import os
 
-# Initialize STT
-stt = STT()
-prompt_text = stt.listen()
+load_dotenv("keys.env")
+os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY")
+conn = sqlite3.connect("memory.db",check_same_thread=False)
+app = FastAPI()
 
-print(f"Transcribed Text: {prompt_text}")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-os.environ['HF_HUB_CACHE'] = "/home/kadalisana/Amadeus/models/cache"
-os.environ['HF_HOME'] = "/home/kadalisana/Amadeus/models"
-os.environ["GOOGLE_API_KEY"]="AIzaSyADGgdcpX1pQuRNisY0cGeZBpjnqvw5jnE"
+@app.post("/api/send")
+async def message(request: Request):
+    data = await request.json()
+    raw_messages = data.get("messages", [])
 
-# Initialize Gemini model
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20",temperature=0)
+    # Convert raw messages to LangChain message objects
+    messages = []
+    for msg in raw_messages:
+        if msg['role'] == 'user':
+            messages.append(HumanMessage(content=msg['content']))
+        else:
+            messages.append(AIMessage(content=msg['content']))
 
-# Create a HumanMessage
-message = HumanMessage(content=prompt_text)
+    print(f"Received Messages: {messages}")
 
-# Get response from Gemini
-response = llm.invoke([message])
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20", temperature=0)
+    agent = create_react_agent(
+        model=llm,
+        tools=[],
+        checkpointer=SqliteSaver(conn)
+    )
 
-print(f"Gemini Response: {response.content}")
+    config = {
+        "configurable": {
+            "thread_id": "1"
+        }
+    }
+
+    response = agent.invoke({"messages": messages}, config)['messages'][-1].content
+    print(f"Gemini Response: {response}")
+
+    return {"status": "success", "reply": response}
